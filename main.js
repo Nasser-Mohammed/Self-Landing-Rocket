@@ -3,7 +3,7 @@
 
 let ctx;
 const dt = 0.0001;
-const g = 9.81;
+const g = 0.5//9.81;
 let frameCount = 0;
 let simulationTime = 0;
 let animationId = null;
@@ -43,7 +43,7 @@ class Rocket{
     this.mass = 200;
     this.centerX = this.x + this.width/2;
     this.centerY = this.y + this.height/2;
-    this.dist2Center = euclideanDistance(centerX, centerY, this.x + this.width, this.y + this.height);
+    this.dist2Center = euclideanDistance(this.centerX, this.centerY, this.x + this.width, this.y + this.height);
     this.leftRocketF = 0;
     this.rightRocketF = 0;
     this.F_total = this.leftRocketF+this.rightRocketF;
@@ -64,7 +64,28 @@ class Rocket{
   }
 
   timeStep(){
-    
+  // Recalculate center
+  this.centerX = this.x + this.width / 2;
+  this.centerY = this.y + this.height / 2;
+
+  // Recalculate forces
+  this.F_total = this.leftRocketF + this.rightRocketF;
+
+  // Acceleration from thrust
+  this.ax = (this.F_total / this.mass) * Math.sin(this.theta);
+  this.ay = (this.F_total / this.mass) * -Math.cos(this.theta) + g; // gravity acts downward
+
+  // Update velocity (Euler integration)
+  this.xVelocity += this.ax * dt;
+  this.yVelocity += this.ay * dt;
+
+  // Update position
+  this.x += this.xVelocity * dt;
+  this.y += this.yVelocity * dt;
+
+  // Optional: update rotation with angular velocity (if you use torque)
+  this.theta += this.omega * dt;
+  console.log("x,y: ", this.x, ", ", this.y);
   }
 }
 
@@ -77,6 +98,9 @@ function animate(){
 
   for (let i = 0; i < stepsPerFrame; i++) {
     xDot = rocket.timeStep();
+    if (rocket.y > landY - rocket.height){
+    rocket.y = landY - rocket.height;
+  }
   }
   ctx.clearRect(0,0, width, height);
 
@@ -111,7 +135,6 @@ function initRocket(){
     ctx.moveTo(landX, landY);
     ctx.arc(landX, landY, 35, 0, 2*Math.PI, false);
     ctx.fill();
-    initRocket();
   }
 
 function startSimulation() {
@@ -138,12 +161,11 @@ function resetSimulation() {
   speedSlider.value = Math.floor(defaultSteps/500);
   speedValue.textContent = speedSlider.value;
   drawPlanet();
-
-  resetStates();
+  initRocket();
   console.log('rewrote canvas');
   cnt = 0;
   multiplier = 1;
-  document.getElementById("time-display").textContent = "Month: 1";
+  //document.getElementById("time-display").textContent = "Month: 1";
   document.getElementById("start-simulation").textContent = "Click to Start Simulation";
 }
 
