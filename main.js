@@ -40,6 +40,10 @@ class Rocket{
     this.width = 110;
     this.fireWidth = 45;
     this.fireHeight = 45;
+    this.leftRocketX = this.x + 3;
+    this.leftRocketY = this.y + this.height - 3;
+    this.rightRocketX = this.x + this.width - 3;
+    this.rightRocketY = this.y + this.height - 3;
     this.mass = 200;
     this.centerX = this.x + this.width/2;
     this.centerY = this.y + this.height/2;
@@ -49,10 +53,48 @@ class Rocket{
     this.F_total = this.leftRocketF+this.rightRocketF;
     this.ax = (this.F_total / this.mass) * Math.sin(this.theta);  // sideways motion
     this.ay = (this.F_total / this.mass) * -Math.cos(this.theta) - g;  // vertical motion
+    this.I = this.mass * this.height * this.height / 12;  // crude box approximation
+    if(this.theta > 0){
+      this.side = 'right';
+    }
+    else{this.side='left'}
   }
 
   controller(){
+    // Decide which thruster to fire
+    if (this.theta < 0) { // Tilted left → fire left thruster to rotate right
+      this.leftRocketF = 20;
+      this.rightRocketF = 0;
+    } else if (this.theta > 0) { // Tilted right → fire right thruster to rotate left
+      this.leftRocketF = 0;
+      this.rightRocketF = 20;
+    } else {
+      this.leftRocketF = 0;
+      this.rightRocketF = 0;
+    }
 
+    // Force vectors
+    let F_left = this.leftRocketF;
+    let F_right = this.rightRocketF;
+    let totalF = F_left + F_right;
+
+    // === Linear acceleration ===
+    let Fx = totalF * Math.sin(this.theta);
+    let Fy = -totalF * Math.cos(this.theta);
+    this.ax = Fx / this.mass;
+    this.ay = Fy / this.mass - g;
+
+    // === Angular acceleration ===
+    // Assuming moment of inertia for vertical box:
+    this.I = (this.mass * this.height * this.height) / 12;
+
+    // Net torque: Left thrust pushes CW, right thrust pushes CCW
+    let torque = this.dist2Center * (F_left - F_right);
+
+    // Angular dynamics
+    this.alpha = torque / this.I;
+    this.omega += this.alpha * dt;
+    this.theta += this.omega * dt;
   }
 
   drawRocket(){
@@ -61,7 +103,39 @@ class Rocket{
     ctx.rotate(rocket.theta);
     ctx.drawImage(rocket.rocketBody, -rocket.width/2, -rocket.height/2, rocket.width, rocket.height);
     ctx.restore();
+    this.drawFire();
   }
+
+  drawFire() {
+  const side = this.side;
+  ctx.save();
+
+  // Rotate around the center of the rocket
+  ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+  ctx.rotate(this.theta);
+
+  // Offset for fire relative to center
+  let offsetX, offsetY;
+  if (side === "left") {
+    offsetX = -this.width / 2 + 8;
+    offsetY = this.height / 2 - 8;
+  } else if (side === "right") {
+    offsetX = this.width / 2 - this.fireWidth - 8;
+    offsetY = this.height / 2 - 8;
+  }
+
+  ctx.drawImage(
+    this.fire,
+    offsetX,
+    offsetY,
+    this.fireWidth,
+    this.fireHeight
+  );
+
+  ctx.restore();
+}
+
+
 
   timeStep(){
   // Recalculate center
@@ -83,9 +157,19 @@ class Rocket{
   this.x += this.xVelocity * dt;
   this.y += this.yVelocity * dt;
 
-  // Optional: update rotation with angular velocity (if you use torque)
+  // Optional: update rotation with angular velocity (if I decide to use torque)
   this.theta += this.omega * dt;
-  console.log("x,y: ", this.x, ", ", this.y);
+  //console.log("x,y: ", this.x, ", ", this.y);
+  this.leftRocketX = this.x + 3;
+  this.leftRocketY = this.y + this.height - 3;
+  this.rightRocketX = this.x + this.width - 3;
+  this.rightRocketY = this.y + this.height - 3;
+  if(this.theta > 0){
+    this.side = "right";
+  }
+  else if(this.theta < 0){
+    this.side = "left";
+  }
   }
 }
 
@@ -98,6 +182,7 @@ function animate(){
 
   for (let i = 0; i < stepsPerFrame; i++) {
     xDot = rocket.timeStep();
+    rocket.controller();
     if (rocket.y > landY - rocket.height){
     rocket.y = landY - rocket.height;
   }
